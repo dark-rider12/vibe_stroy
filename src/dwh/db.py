@@ -9,21 +9,25 @@ from typing import Any
 
 import psycopg
 
-from .config import DATABASE_URL
+from .config import LAYERS, database_urls
+
+_urls = database_urls()
 
 _ALLOWED_PREFIXES = ("SELECT", "WITH", "TABLE")
 
 
-def connect() -> psycopg.Connection:
-    return psycopg.connect(DATABASE_URL)
+def connect(layer: str = "dds") -> psycopg.Connection:
+    if layer not in LAYERS:
+        raise ValueError(f"Неизвестный слой: {layer!r}. Доступно: {', '.join(LAYERS)}.")
+    return psycopg.connect(_urls[layer])
 
 
-def query(sql: str, params: tuple | None = None) -> list[dict[str, Any]]:
+def query(sql: str, params: tuple | None = None, layer: str = "dds") -> list[dict[str, Any]]:
     guard = sql.lstrip().upper()
     if not guard.startswith(_ALLOWED_PREFIXES):
         raise ValueError("Разрешены только запросы на чтение (SELECT/WITH/TABLE).")
 
-    with connect() as conn, conn.cursor() as cur:
+    with connect(layer) as conn, conn.cursor() as cur:
         cur.execute(sql, params)
         if cur.description is None:
             return []
